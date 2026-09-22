@@ -49,7 +49,7 @@ Então o software precisa decidir quem fica com o SDR.
 E um rádio sem antena não escuta muita coisa.
 
 <p align="center">
-  <img src="imgs/antena.jpg" alt="Antena artesanal para recepção SDR" width="600">
+  <img src="imgs/antena.png" alt="Antena artesanal para recepção SDR" width="600">
 </p>
 
 Parte da graça do SDR é justamente experimentar também com o lado físico da coisa: antenas simples, cabo coaxial, conectores, posição, comprimento dos elementos e descobrir até onde um receptor USB consegue enxergar.
