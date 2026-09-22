@@ -44,19 +44,31 @@ Então o software precisa decidir quem fica com o SDR.
 
 ---
 
-## 🛸 A estação
+## 🛸 A antena
 
 E um rádio sem antena não escuta muita coisa.
 
 <p align="center">
-  <img src="imgs/antena.png" alt="Antena artesanal para recepção SDR" width="600">
+  <img src="imgs/antena.png" alt="Antena artesanal usada no LuliRadar" width="600">
 </p>
 
-Parte da graça do SDR é justamente experimentar também com o lado físico da coisa: antenas simples, cabo coaxial, conectores, posição, comprimento dos elementos e descobrir até onde um receptor USB consegue enxergar.
+Essa é a antena artesanal que estou usando no projeto.
 
-Uma antena artesanal ajustada para a frequência desejada já é suficiente para começar a receber sinais que estavam literalmente atravessando o ar o tempo inteiro.
+Ela foi feita principalmente para experimentar a recepção de **rádio aeronáutico VHF**, usando uma construção bem simples com cabo coaxial e um cano de PVC.
 
-Só faltava alguma coisa para escutá-los.
+Dentro do PVC ficam aproximadamente **60 cm do condutor central do cabo coaxial exposto**.
+
+Na malha do coaxial foi soldado um fio de cobre retirado de outro cabo coaxial. Esse fio retorna por cima da parte não descascada do cabo, também com aproximadamente **60 cm**.
+
+E é basicamente isso.
+
+O cano de PVC serve de suporte e proteção para a parte vertical da antena.
+
+Ela não foi construída pensando especificamente em ADS-B, mas acabou conseguindo receber também sinais em **1090 MHz**.
+
+Então ADS-B virou um belo bônus.
+
+Parte da graça do SDR é justamente essa: experimentar com cabo, antena, posição, comprimento, software e descobrir o que aparece.
 
 ---
 
@@ -67,7 +79,7 @@ No modo ADS-B, o RTL-SDR é entregue ao `dump1090-mutability`, responsável pela
 O LuliRadar acompanha os dados produzidos pelo decoder e constrói sua própria visão do espaço aéreo recebido pela estação.
 
 <p align="center">
-  <img src="imgs/Captura%20de%20tela%20de%202026-09-21%2022-30-29.png" alt="Tela ADS-B do LuliRadar" width="900">
+  <img src="imgs/ADS-B_ao_vivo.png" alt="Mapa ADS-B ao vivo do LuliRadar" width="900">
 </p>
 
 Atualmente é possível acompanhar:
@@ -96,6 +108,22 @@ O sistema também faz uma classificação simples do comportamento observado:
 - afastando-se do receptor.
 
 Esses estados são **inferências feitas pelo LuliRadar**, e não informações oficiais de fase de voo.
+
+---
+
+## 🕰️ Histórico ADS-B
+
+O mapa ao vivo é divertido, mas eu não queria que uma aeronave simplesmente desaparecesse da história assim que saísse do alcance da antena.
+
+Por isso o LuliRadar também mantém um histórico local das passagens recebidas pela estação.
+
+<p align="center">
+  <img src="imgs/ADS-B_historico.png" alt="Histórico ADS-B do LuliRadar" width="900">
+</p>
+
+As sessões armazenadas permitem voltar no tempo e consultar aeronaves que passaram pelo alcance do receptor, junto com as posições registradas durante aquela recepção.
+
+A ideia é que a estação não apenas mostre **o que está acontecendo agora**, mas construa aos poucos uma memória própria do céu que conseguiu observar.
 
 ---
 
@@ -141,8 +169,8 @@ Os dados atuais ficam em memória para resposta rápida da API, enquanto informa
 >
 > A recepção de áudio pelo LuliRadar já funciona, assim como o controle do
 > `rtl_fm`, medição de nível e a estrutura para gravação automática.
-> **Mas a experiência de escuta ainda está meio bugada e não está tão boa
-> quanto eu quero.**
+>
+> **Mas a experiência de escuta ainda está meio bugada e não está tão boa quanto eu quero.**
 >
 > Se a intenção agora é simplesmente sintonizar e ouvir rádio aeronáutico,
 > **use o SDR++ — atualmente ele faz isso muito melhor. 😅**
@@ -156,7 +184,7 @@ O segundo modo do projeto entrega o dongle ao `rtl_fm`.
 Em vez de decodificar pacotes ADS-B, agora estamos experimentando com a recepção de **rádio aeronáutico VHF em AM**.
 
 <p align="center">
-  <img src="imgs/Captura%20de%20tela%20de%202026-09-21%2022-31-10.png" alt="Tela experimental de rádio do LuliRadar" width="900">
+  <img src="imgs/radio_aeronautico.png" alt="Modo experimental de rádio aeronáutico do LuliRadar" width="900">
 </p>
 
 A interface já permite selecionar frequências, ajustar parâmetros e acompanhar o nível recebido.
@@ -388,7 +416,7 @@ Essa talvez seja a verdadeira razão de o projeto existir.
 
 Um RTL-SDR é um negócio relativamente pequeno conectado numa USB.
 
-Uma antena pode ser literalmente construída na bancada com cabo, conectores e pedaços de metal.
+Uma antena pode ser literalmente feita com **cabo coaxial, um pedaço de fio de cobre e um cano de PVC**.
 
 E de repente aparecem:
 
@@ -580,10 +608,11 @@ LuliRadar/
 │   └── frequencies.json
 │
 ├── imgs/
-│   ├── Captura de tela de 2026-09-21 22-30-29.png
-│   ├── Captura de tela de 2026-09-21 22-31-10.png
-│   ├── rtl-sdr-v4.jpg
-│   └── antena-artesanal.jpg
+│   ├── ADS-B_ao_vivo.png
+│   ├── ADS-B_historico.png
+│   ├── antena.png
+│   ├── radio_aeronautico.png
+│   └── sdr.jpg
 │
 ├── static/
 ├── templates/
