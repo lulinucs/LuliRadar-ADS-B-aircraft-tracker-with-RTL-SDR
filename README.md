@@ -1,313 +1,658 @@
-# SDR Aviation Monitor
+# 📡 LuliRadar
 
-Estação local de monitoramento aeronáutico usando **um único RTL-SDR Blog V4**,
-com dois modos de operação **mutuamente exclusivos**:
+> Aviões, rádio, sinais atravessando o céu — e um RTL-SDR fazendo coisa demais.
 
-- **ADS-B** — recepção via `dump1090-mutability`, mapa ao vivo, histórico de voos e trilhas.
-- **Rádio aeronáutico (AM)** — recepção via `rtl_fm`, presets, medidor de nível e
-  gravação automática de transmissões.
+O **LuliRadar** é minha estação pessoal de monitoramento aeronáutico construída em volta de um **RTL-SDR Blog V4**.
 
-Um `SDRManager` central garante que **apenas um processo por vez** use o
-dongle: ativar um modo sempre encerra o outro primeiro.
+A ideia começou simples: receber **ADS-B em 1090 MHz** e enxergar os aviões que estavam realmente passando pelo alcance da minha antena.
+
+Naturalmente, saiu do controle.
+
+Hoje o mesmo dongle também pode virar um receptor de **rádio aeronáutico VHF em AM**, acompanhar frequências locais, reproduzir o áudio, detectar transmissões, gravá-las automaticamente e manter um histórico das aeronaves recebidas.
+
+Tudo localmente.
+
+Sem depender de FlightRadar para dizer o que **meu próprio rádio** está recebendo.
+
+Só antena, RF, alguns programas clássicos do ecossistema SDR e código.
 
 ---
 
-## 1. Dependências do sistema (apt)
+## 📻 O rádio
+
+<p align="center">
+  <img src="imgs/rtl-sdr-v4.jpg" alt="RTL-SDR Blog V4" width="600">
+</p>
+
+No centro do projeto está um **RTL-SDR Blog V4**.
+
+Originalmente derivados de receptores USB de TV digital, dispositivos RTL-SDR transformaram hardware barato em receptores de rádio definidos por software capazes de explorar uma faixa enorme do espectro.
+
+No LuliRadar, um único dongle atualmente tem duas vidas:
+
+**✈️ ADS-B — 1090 MHz**  
+Recebe as transmissões digitais enviadas pelas aeronaves.
+
+**🎙️ Rádio aeronáutico — VHF AM**  
+Permite ouvir e registrar comunicações em frequências como Torre, Solo e ATIS.
+
+O problema divertido é que ele continua sendo **um único rádio**.
+
+Ele não pode estar em 1090 MHz e 118.700 MHz ao mesmo tempo.
+
+Então o software precisa decidir quem fica com o SDR.
+
+---
+
+## 🛸 A estação
+
+E um rádio sem antena não escuta muita coisa.
+
+<p align="center">
+  <img src="imgs/antena-artesanal.jpg" alt="Antena artesanal para recepção SDR" width="600">
+</p>
+
+Parte da graça do SDR é justamente experimentar também com o lado físico da coisa: antenas simples, cabo coaxial, conectores, posição, comprimento dos elementos e descobrir até onde um receptor USB consegue enxergar.
+
+Uma antena artesanal ajustada para a frequência desejada já é suficiente para começar a receber sinais que estavam literalmente atravessando o ar o tempo inteiro.
+
+Só faltava alguma coisa para escutá-los.
+
+---
+
+# ✈️ ADS-B
+
+No modo ADS-B, o RTL-SDR é entregue ao `dump1090-mutability`, responsável pela recepção e decodificação das mensagens transmitidas pelas aeronaves em **1090 MHz**.
+
+O LuliRadar acompanha os dados produzidos pelo decoder e constrói sua própria visão do espaço aéreo recebido pela estação.
+
+<p align="center">
+  <img src="imgs/Captura%20de%20tela%20de%202026-09-21%2022-30-29.png" alt="Tela ADS-B do LuliRadar" width="900">
+</p>
+
+Atualmente é possível acompanhar:
+
+- aeronaves dentro do alcance;
+- posição no mapa;
+- ICAO;
+- callsign;
+- altitude;
+- velocidade;
+- rumo;
+- taxa vertical;
+- distância até o receptor;
+- tempo desde a última mensagem;
+- trilha recente;
+- histórico de passagens;
+- sessões de voo armazenadas em SQLite.
+
+O sistema também faz uma classificação simples do comportamento observado:
+
+- provável subida;
+- provável descida;
+- provável cruzeiro;
+- baixa altitude;
+- aproximando-se do receptor;
+- afastando-se do receptor.
+
+Esses estados são **inferências feitas pelo LuliRadar**, e não informações oficiais de fase de voo.
+
+---
+
+## 🗺️ Do sinal até o mapa
+
+O LuliRadar não tenta reinventar um decoder ADS-B.
+
+Essa parte já é muito bem resolvida pelo `dump1090`.
+
+A aplicação entra depois:
+
+```mermaid
+flowchart LR
+    ANT["📡 Antena"]
+    SDR["📻 RTL-SDR"]
+    DUMP["dump1090-mutability"]
+    JSON["aircraft.json"]
+    LULI["LuliRadar"]
+    DB[("SQLite")]
+    WEB["🗺️ Interface web"]
+
+    ANT --> SDR
+    SDR --> DUMP
+    DUMP --> JSON
+    JSON --> LULI
+    LULI --> DB
+    LULI --> WEB
+```
+
+O `dump1090-mutability` recebe e decodifica.
+
+O LuliRadar cuida de:
+
+**ingerir → normalizar → interpretar → armazenar → apresentar**
+
+Os dados atuais ficam em memória para resposta rápida da API, enquanto informações úteis para histórico são persistidas em SQLite.
+
+---
+
+# 🎙️ Rádio aeronáutico
+
+O segundo modo entrega o dongle ao `rtl_fm`.
+
+Em vez de decodificar pacotes ADS-B, agora estamos simplesmente **ouvindo rádio**.
+
+<p align="center">
+  <img src="imgs/Captura%20de%20tela%20de%202026-09-21%2022-31-10.png" alt="Tela de rádio do LuliRadar" width="900">
+</p>
+
+A interface permite selecionar frequências aeronáuticas, ajustar parâmetros e acompanhar o nível recebido.
+
+O áudio demodulado em AM é reproduzido localmente através do `aplay`.
+
+Mas eu não queria simplesmente deixar um rádio tocando.
+
+Então o LuliRadar também fica ouvindo o próprio áudio.
+
+---
+
+## 🔴 Gravação automática
+
+O PCM produzido pelo `rtl_fm` passa pelo backend.
+
+A aplicação calcula o nível RMS do sinal e o converte para **dBFS**.
+
+Quando o nível ultrapassa o squelch configurado:
+
+**começou uma transmissão.**
+
+O LuliRadar abre uma gravação.
+
+Quando o sinal desaparece pelo tempo configurado:
+
+**acabou a transmissão.**
+
+O WAV é fechado e a ocorrência fica registrada.
+
+```mermaid
+flowchart LR
+    ANT["📡 Antena"]
+    SDR["RTL-SDR"]
+    FM["rtl_fm"]
+    PCM["PCM"]
+    LULI["LuliRadar"]
+
+    AUDIO["🔊 Áudio local"]
+    LEVEL["📊 RMS / dBFS"]
+    REC["🔴 Gravador"]
+    WAV["WAV"]
+    DB[("SQLite")]
+
+    ANT --> SDR
+    SDR --> FM
+    FM --> PCM
+    PCM --> LULI
+
+    LULI --> AUDIO
+    LULI --> LEVEL
+    LEVEL --> REC
+    REC --> WAV
+    REC --> DB
+```
+
+Existe ainda um **pré-buffer circular**.
+
+Isso permite guardar alguns instantes anteriores à detecção e reduz a chance de a gravação começar depois das primeiras sílabas da transmissão.
+
+É um detalhe pequeno.
+
+Mas é exatamente o tipo de detalhe que transforma:
+
+> “consigo ouvir rádio”
+
+em:
+
+> “estou construindo uma estação”.
+
+---
+
+## 🎚️ Frequências
+
+As frequências ficam fora do código, em:
+
+```text
+config/frequencies.json
+```
+
+A configuração atual inclui:
+
+| Canal | Frequência |
+|---|---:|
+| Torre Florianópolis | 118.700 MHz |
+| Emergência / Guard | 121.500 MHz |
+| Solo Florianópolis | 121.700 MHz |
+| Operações Florianópolis | 122.500 MHz |
+| Torre MIL | 122.800 MHz |
+| ATIS Florianópolis | 127.450 MHz |
+
+Isso significa que a aplicação não precisa ficar presa a Florianópolis.
+
+Troque o arquivo de frequências e a estação pode ganhar presets de outro lugar.
+
+Também é possível sintonizar uma frequência manualmente.
+
+---
+
+# 🧠 Um dongle, dois mundos
+
+Aqui apareceu um problema interessante de software causado por uma limitação física.
+
+Só existe **um RTL-SDR**.
+
+ADS-B e rádio não podem simplesmente abrir o dispositivo ao mesmo tempo.
+
+Por isso existe um componente central chamado `SDRManager`.
+
+```mermaid
+flowchart TD
+    SDR["📻 RTL-SDR Blog V4"]
+    MANAGER["SDRManager"]
+
+    ADSB["✈️ ADS-B<br>dump1090"]
+    RADIO["🎙️ Rádio AM<br>rtl_fm"]
+
+    SDR <--> MANAGER
+
+    MANAGER -->|"1090 MHz"| ADSB
+    MANAGER -->|"VHF"| RADIO
+```
+
+Ele mantém uma pequena máquina de estados:
+
+```text
+          ┌───────────┐
+          │   IDLE    │
+          └─────┬─────┘
+                │
+                ▼
+        ┌───────────────┐
+        │   SWITCHING   │
+        └──────┬─┬──────┘
+               │ │
+          ┌────┘ └────┐
+          ▼           ▼
+      ┌──────┐    ┌───────┐
+      │ ADSB │    │ RADIO │
+      └──────┘    └───────┘
+```
+
+Antes de entregar o SDR para outro modo, o processo atual precisa ser encerrado e o dispositivo USB realmente liberado.
+
+Só então o próximo processo é iniciado.
+
+O backend ainda espera alguns instantes para confirmar que o novo processo não morreu imediatamente por coisas como:
+
+```text
+device busy
+```
+
+Se duas requisições tentarem trocar o rádio simultaneamente, uma delas é rejeitada em vez de deixar dois processos disputarem o hardware.
+
+Essa parte acabou sendo uma das coisas mais interessantes do projeto.
+
+O software precisa respeitar o rádio.
+
+---
+
+# 🕰️ Memória da estação
+
+Eu não queria apenas saber:
+
+> “quais aviões estou vendo agora?”
+
+Quero conseguir olhar para trás.
+
+Por isso o LuliRadar mantém um banco SQLite com informações como:
+
+- aeronaves conhecidas;
+- sessões de voo;
+- posições recebidas;
+- horários;
+- distâncias;
+- estatísticas ADS-B;
+- transmissões de rádio;
+- gravações.
+
+As posições não são simplesmente despejadas no banco a cada atualização.
+
+Existe throttling para evitar armazenar milhares de pontos praticamente idênticos.
+
+A ideia é construir aos poucos uma **memória local do que minha própria estação recebeu**.
+
+---
+
+# 🔬 E agora começa a parte realmente divertida
+
+ADS-B e rádio hoje são dois modos diferentes.
+
+Mas eles têm algo em comum:
+
+**tempo.**
+
+O LuliRadar sabe aproximadamente:
+
+> qual aeronave estava onde em determinado instante
+
+e também:
+
+> em qual frequência houve uma transmissão naquele instante.
+
+Isso abre uma possibilidade que quero explorar bastante.
+
+```text
+14:32:08
+│
+├── 📻 transmissão recebida em 118.700 MHz
+│
+└── ✈️ aeronaves observadas naquele momento
+      ├── AZU1234
+      ├── GLO5678
+      └── ...
+```
+
+Isso não significa que seja possível afirmar automaticamente quem falou.
+
+Mas significa que os dois conjuntos de dados podem começar a conversar.
+
+---
+
+## 🔭 Ideias para as próximas versões
+
+Algumas coisas que quero experimentar:
+
+- correlacionar transmissões com aeronaves observadas naquele instante;
+- mostrar quais aeronaves estavam próximas durante uma gravação;
+- reproduzir gravações diretamente pelo histórico;
+- transcrever comunicações gravadas;
+- pesquisar transmissões por frequência e horário;
+- melhorar a classificação de subida/descida;
+- detectar possíveis aproximações;
+- adicionar conhecimento sobre aeroportos e pistas;
+- visualizar aproximações e decolagens no histórico;
+- gerar estatísticas da estação;
+- medir alcance máximo por direção;
+- construir mapas de cobertura;
+- identificar horários de maior atividade;
+- explorar outras frequências;
+- explorar outros modos de recepção;
+- experimentar outras antenas.
+
+E provavelmente inventar mais coisa conforme sinais interessantes aparecerem.
+
+---
+
+# 📡 Porque SDR é irado
+
+Essa talvez seja a verdadeira razão de o projeto existir.
+
+Um RTL-SDR é um negócio relativamente pequeno conectado numa USB.
+
+Uma antena pode ser literalmente construída na bancada com cabo, conectores e pedaços de metal.
+
+E de repente aparecem:
+
+```text
+aviões
+torres
+ATIS
+telemetria
+rádio
+satélites
+AIS
+sensores
+balões
+radioamadores
+e um monte de coisa que eu ainda nem fui procurar
+```
+
+Esses sinais já estavam ali.
+
+Atravessando minha casa.
+
+Atravessando a cidade.
+
+Atravessando o computador onde estou escrevendo esse README.
+
+O SDR só permite que eu finalmente enxergue alguns deles.
+
+E aí obviamente eu quero escrever software em cima.
+
+---
+
+# 🛠️ Stack
+
+O LuliRadar tenta continuar relativamente simples.
+
+### Aplicação
+
+- Python
+- Flask
+- SQLite
+- JavaScript
+- HTML
+- CSS
+
+### Rádio
+
+- RTL-SDR Blog V4
+- `rtl_fm`
+- `dump1090-mutability`
+- `aplay`
+
+### E só.
+
+Sem React.
+
+Sem Redis.
+
+Sem microsserviços.
+
+Sem necessidade de colocar uma estação de rádio doméstica dentro de um cluster Kubernetes.
+
+---
+
+# 🚀 Rodando o LuliRadar
+
+O projeto foi desenvolvido para Linux.
+
+## Dependências do sistema
+
+Em Debian/Ubuntu/Pop!_OS:
 
 ```bash
 sudo apt update
 sudo apt install python3-venv python3-pip rtl-sdr dump1090-mutability alsa-utils
 ```
 
-- `rtl-sdr` fornece `rtl_fm`, `rtl_test` etc.
-- `dump1090-mutability` você já tem instalado e funcionando.
-- `alsa-utils` fornece `aplay` (reprodução local do áudio do rádio).
+O `dump1090-mutability` instalado pelo sistema pode iniciar automaticamente e tomar posse do RTL-SDR.
 
-### 1.1 IMPORTANTE: desative o serviço systemd do dump1090
-
-O pacote `dump1090-mutability` registra um **serviço systemd que inicia
-sozinho no boot** e tenta abrir o RTL-SDR. Ele vai brigar com esta aplicação
-pelo dongle (erro "device busy"). Desative-o uma vez, permanentemente:
+Como o próprio LuliRadar controla quando o decoder deve rodar, desative o serviço:
 
 ```bash
 sudo systemctl disable --now dump1090-mutability
 ```
 
-Você pode confirmar que está desligado com `systemctl status dump1090-mutability`.
+---
 
-> Esta aplicação **também mata automaticamente** qualquer processo
-> `dump1090-mutability` ou `rtl_fm` que já esteja rodando toda vez que você
-> inicia `run.py` (inclusive uma sessão manual como
-> `dump1090-mutability --interactive` que você tenha aberto num terminal) —
-> isso é proposital, para garantir posse exclusiva do dongle sem você
-> precisar matar nada na mão. Ver seção 8 (Robustez).
+## Clone
+
+```bash
+git clone https://github.com/lulinucs/LuliRadar-ADS-B-aircraft-tracker-with-RTL-SDR.git
+cd LuliRadar-ADS-B-aircraft-tracker-with-RTL-SDR
+```
 
 ---
 
-## 2. Dependências Python
+## Ambiente Python
 
 ```bash
-cd /home/luli/dev/sdrlab/luliradar
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-(Alternativa sem venv, já que `python3-flask` está disponível via apt:
-`sudo apt install python3-flask` e rode com o `python3` do sistema.)
-
 ---
 
-## 3. Configurar a posição do receptor (obrigatório)
+## Configuração
+
+Copie o exemplo:
 
 ```bash
 cp .env.example .env
 ```
 
-Edite `.env` e preencha, com a posição real da sua antena (não inventamos
-esse valor por você):
+Configure pelo menos a posição da estação:
 
-```
-RECEIVER_LAT=-23.5505
-RECEIVER_LON=-46.6333
+```env
+RECEIVER_LAT=
+RECEIVER_LON=
 RECEIVER_LABEL=Minha estação
 ```
 
-Sem isso, o mapa carrega centralizado no (0,0) e as distâncias das
-aeronaves não são calculadas.
+A posição é usada para calcular a distância entre o receptor e as aeronaves recebidas.
+
+Outros parâmetros permitem ajustar comportamento do ADS-B, rádio, squelch, ganho, gravações e caminhos dos binários.
 
 ---
 
-## 4. Presets de rádio (Torre, ATIS, ...)
-
-`config/frequencies.json` já vem preenchido com as frequências reais do
-Aeroporto Internacional Hercílio Luz / Florianópolis (SBFL), fonte
-AISWEB/DECEA:
-
-| Preset | Frequência | 
-|---|---|
-| Torre Florianópolis | 118.700 MHz |
-| ATIS Florianópolis | 127.450 MHz |
-| Solo Florianópolis | 121.700 MHz |
-| Operações Florianópolis | 122.500 MHz |
-| Emergência / Guard | 121.500 MHz |
-| Torre MIL | 122.800 MHz |
-
-Se for usar outro aeródromo, edite `frequency_mhz` (sempre em **MHz com
-ponto decimal**, ex.: `118.700` — nunca `118700`) ou adicione novos presets
-seguindo o mesmo formato. O backend valida a faixa (20–1800 MHz, a faixa do
-RTL-SDR) e recusa valores fora dela com uma mensagem clara, então um erro de
-dígito não passa mais despercebido.
-
----
-
-## 5. Executar
+## Executando
 
 ```bash
-source .venv/bin/activate   # se estiver usando venv
 python3 run.py
 ```
 
-Acesse no navegador: **http://127.0.0.1:5000**
+Depois abra:
 
-Pressione `Ctrl+C` para encerrar — o servidor derruba de forma limpa
-qualquer `dump1090-mutability`/`rtl_fm` em execução antes de sair.
+```text
+http://127.0.0.1:5000
+```
 
 ---
 
-## 6. Navegar entre abas x controlar o SDR
+# 🧪 Testes
 
-**Clicar nas abas "ADS-B" / "RÁDIO" no topo só troca o que é exibido - nunca
-liga ou desliga nada no dongle.** Quem controla o hardware são os botões
-dentro de cada painel:
-
-- Painel ADS-B: **Iniciar ADS-B** / **Parar ADS-B** (ou **ASSUMIR SDR /
-  INICIAR ADS-B** se o rádio estiver ativo no momento).
-- Painel Rádio: **Iniciar Rádio** / **Parar** (ou **ASSUMIR SDR / INICIAR
-  RÁDIO** se o ADS-B estiver ativo no momento).
-
-O indicador **SDR ONLINE/OFFLINE/TROCANDO MODO/ERRO** no topo sempre reflete
-o hardware de verdade, independente de qual aba você está olhando - se você
-estiver na aba Rádio enquanto o ADS-B está ativo, um aviso aparece
-explicitamente ("SDR atualmente em uso pelo ADS-B").
-
-## 7. Validar o modo ADS-B
-
-1. Na aba **ADS-B**, clique **Iniciar ADS-B**.
-2. O indicador no topo muda para `TROCANDO MODO...` por ~1s e depois
-   `SDR ONLINE (ADS-B)`. O painel de status deve mostrar `dump1090: rodando`
-   e, em alguns segundos, `Aeronaves visíveis` > 0 se houver tráfego.
-3. Clique numa aeronave no mapa ou na tabela para ver detalhes e trilha.
-4. Abra **Histórico ADS-B** para ver sessões já encerradas.
-5. Clique **Parar ADS-B** - o indicador deve voltar para `SDR OFFLINE / IDLE`.
-
-Teste manual do dump1090 fora da aplicação (pare a aplicação antes, para
-não haver disputa pelo dongle):
+Boa parte da aplicação pode ser testada sem colocar a mão no SDR real.
 
 ```bash
-dump1090-mutability --interactive
+python3 -m unittest discover -s tests -v
+node tests/test_frontend_format.mjs
 ```
 
-Se aeronaves aparecem aí mas não na aplicação, veja a seção de Troubleshooting.
+Os testes usam processos simulados para validar partes como:
+
+- troca de modos;
+- concorrência;
+- parâmetros do rádio;
+- rotas HTTP;
+- formatação do frontend;
+- comportamento do `SDRManager`.
+
+Isso é particularmente útil porque:
+
+> “os testes passaram, mas preciso de um avião sobrevoando minha casa”
+
+não seria uma estratégia de CI muito prática.
 
 ---
 
-## 8. Validar o modo Rádio
+# 📂 Estrutura
 
-1. Vá para a aba **RÁDIO** (isso só troca a exibição - o ADS-B, se estiver
-   rodando, continua ativo até você assumir).
-2. Escolha o preset **ATIS Florianópolis** (127.450 MHz - bom teste porque
-   ATIS transmite quase continuamente) e clique **Iniciar Rádio** (ou
-   **ASSUMIR SDR / INICIAR RÁDIO** se o ADS-B estava ativo).
-3. O medidor de nível deve se mover; ao aparecer sinal acima do squelch, o
-   estado muda para `RECEBENDO`/`GRAVANDO` e uma gravação `.wav` é criada em
-   `recordings/AAAA-MM-DD/`.
-4. A gravação aparece em **Últimas transmissões**, com o preset e a
-   frequência corretos (**127.450 MHz**, não `127450.000`); clique **OUVIR**
-   para reproduzir pelo navegador.
-5. Clique **Parar** - o indicador volta para `SDR OFFLINE / IDLE`.
-
-Teste manual do rtl_fm fora da aplicação:
-
-```bash
-rtl_fm -f 127450000 -M am -s 48000 -g 40 -l 0 - | aplay -q -r 48000 -f S16_LE -t raw -c 1
+```text
+LuliRadar/
+│
+├── app/
+│   ├── adsb_service.py
+│   ├── radio_service.py
+│   ├── sdr_manager.py
+│   ├── database.py
+│   ├── models.py
+│   ├── state_classifier.py
+│   ├── distance.py
+│   ├── routes.py
+│   └── config.py
+│
+├── config/
+│   └── frequencies.json
+│
+├── imgs/
+│   ├── Captura de tela de 2026-09-21 22-30-29.png
+│   ├── Captura de tela de 2026-09-21 22-31-10.png
+│   ├── rtl-sdr-v4.jpg
+│   └── antena-artesanal.jpg
+│
+├── static/
+├── templates/
+├── tests/
+│
+├── run.py
+├── requirements.txt
+├── .env.example
+└── README.md
 ```
 
-(`-f` já em Hz - 127.450 MHz × 1.000.000).
+Dados produzidos durante o uso ficam fora do Git:
+
+```text
+data/
+recordings/
+.env
+```
 
 ---
 
-## 9. Rodar os testes automatizados (sem tocar no dongle)
+# 🛰️ O que este projeto não é
 
-```bash
-python3 -m unittest discover -s tests -v   # backend: máquina de estados, presets, HTTP
-node tests/test_frontend_format.mjs         # frontend: formatação de frequência
+O LuliRadar não pretende substituir:
+
+- FlightRadar24;
+- ADS-B Exchange;
+- SDR++;
+- scanners profissionais;
+- softwares especializados de controle de tráfego aéreo.
+
+Eles resolvem problemas diferentes.
+
+Esse projeto é uma **estação pessoal de experimentação**.
+
+Eu quero acompanhar o caminho inteiro:
+
+```text
+sinal no ar
+    ↓
+antena
+    ↓
+RTL-SDR
+    ↓
+decoder / demodulador
+    ↓
+Python
+    ↓
+dados
+    ↓
+histórico
+    ↓
+interface
+    ↓
+"caralho, tem um avião passando ali"
 ```
 
-Todos usam `subprocess.Popen` simulado (`tests/fakes.py`) e diretórios
-temporários - nunca abrem o RTL-SDR nem escrevem em `data/`/`recordings/`
-reais.
+É uma desculpa para aprender rádio fazendo software.
+
+E uma desculpa para fazer software brincando com rádio.
 
 ---
 
-## 10. Robustez / o que já foi tratado
+# 📻 LuliRadar
 
-- **Máquina de estados única**: `SDRManager` (`app/sdr_manager.py`) é a
-  única autoridade sobre o dongle, com estados `IDLE / ADSB / RADIO /
-  SWITCHING / ERROR`. Trocar de modo sempre encerra o processo anterior,
-  confirma que ele morreu, só então inicia o novo, e confirma que o novo
-  processo não caiu de imediato antes de declarar o modo ativo.
-- **Navegação x hardware são independentes**: clicar nas abas nunca chama
-  `/api/mode/*`/`/api/stop` - só os botões Iniciar/Parar/Assumir SDR fazem
-  isso (ver seção 6).
-- **Duas trocas simultâneas**: uma trava não-bloqueante rejeita a segunda
-  solicitação com HTTP 409 em vez de deixá-las correr em paralelo.
-- **Processos órfãos**: subprocessos são criados com `start_new_session=True`
-  e encerrados com SIGTERM → aguarda → SIGKILL se necessário
-  (`app/procutil.py`). No startup, `cleanup_stray_processes()` mata
-  sobras de execuções anteriores antes de tocar no dongle.
-- **Encerramento do servidor**: `run.py` registra handlers de `SIGINT`/
-  `SIGTERM` e `atexit` que chamam `SDRManager.shutdown()` (para tudo) e
-  fecham o banco antes de sair.
-- **WAV nunca corrompido**: o arquivo é fechado (`wave.close()`) tanto ao
-  detectar fim de transmissão quanto ao parar o rádio ou o servidor.
-- **SQLite multi-thread**: uma única conexão, protegida por lock
-  (`app/database.py`); todas as threads (poll do ADS-B, loop de áudio do
-  rádio, requisições HTTP) passam por ela.
-- **Sem chamadas bloqueantes no request thread**: leitura de `aircraft.json`
-  e do PCM do `rtl_fm` rodam em threads dedicadas; as rotas HTTP só leem
-  caches em memória ou fazem queries rápidas no SQLite.
-- **dump1090/rtl_fm morrendo**: os loops de poll detectam
-  `proc.poll() is not None` e reportam erro em `/api/status`, exibido como
-  toast na interface.
+**O céu está transmitindo um monte de coisa.**
 
----
-
-## 11. Troubleshooting
-
-**"usb_claim_interface error" / "device busy"**
-Outro processo já tem o dongle aberto. Confira:
-```bash
-sudo systemctl status dump1090-mutability   # deve estar "inactive"/"disabled"
-ps aux | grep -E "dump1090|rtl_fm|SDR"
-```
-Mate manualmente se necessário (`pkill -f dump1090-mutability`,
-`pkill -f rtl_fm`) e reinicie `python3 run.py` (ele também tenta limpar
-isso sozinho no início).
-
-**"kernel driver attached" / "usb_open error"**
-O driver `dvb_usb_rtl28xxu` do kernel pode capturar o dongle antes do
-`librtlsdr`. Confirme que a regra em `/etc/udev/rules.d/20-rtlsdr.rules`
-existe (normalmente já vem com o pacote `rtl-sdr`) e faça
-replug do dongle. Em último caso: `sudo modprobe -r dvb_usb_rtl28xxu`.
-
-**"Permission denied" ao abrir o dispositivo USB**
-Confirme que seu usuário está no grupo `plugdev` (`groups $USER`) e que a
-regra udev de `rtl-sdr` está instalada; depois, faça logout/login (ou
-replug do dongle).
-
-**"dump1090 já rodando" mesmo tendo fechado a aplicação**
-Verifique `systemctl status dump1090-mutability` (seção 1.1) — o serviço
-systemd pode ter reiniciado no boot. Desabilite-o permanentemente.
-
-**SDR++ (ou outro programa) usando o dongle**
-Só um programa pode ter o RTL-SDR aberto por vez. Feche o SDR++ (ou
-qualquer outro SDR software) antes de usar esta aplicação, e vice-versa.
-
----
-
-## 12. Estrutura do projeto
-
-```
-luliradar/
-  run.py                    # ponto de entrada (signal handlers, cleanup, Flask.run)
-  requirements.txt
-  .env.example               # copie para .env e configure RECEIVER_LAT/LON
-  app/
-    config.py                 # Settings (env vars / .env)
-    database.py                # SQLite thread-safe + schema
-    distance.py                 # Haversine
-    models.py                    # SDRState, normalização do aircraft.json
-    state_classifier.py           # inferência simples de estado de voo
-    procutil.py                    # terminate_process / cleanup_stray_processes
-    sdr_manager.py                  # exclusividade mútua ADS-B <-> Rádio
-    adsb_service.py                  # processo dump1090 + polling do aircraft.json + DB
-    radio_service.py                  # processo rtl_fm + VAD + gravação WAV + DB
-    routes.py                          # todas as rotas HTTP (páginas + API)
-    __init__.py                         # application factory
-  templates/index.html          # SPA única (troca de painel via JS)
-  static/app.js, style.css
-  config/frequencies.json        # presets de rádio (Torre/ATIS/Solo/... de SBFL)
-  tests/                          # testes automatizados (sem tocar no dongle)
-    fakes.py                        # FakeProcess/FakePopenFactory (substituem subprocess.Popen)
-    test_sdr_manager.py              # máquina de estados: A-G, P, Q, órfãos, SIGKILL
-    test_radio_params.py              # resolução de preset, unidades MHz->Hz
-    test_http_smoke.py                 # rotas HTTP fim-a-fim
-    test_frontend_format.mjs            # formatação de frequência no JS (node)
-  data/aviation.db                # criado automaticamente
-  data/dump1090_json/              # aircraft.json do dump1090 (criado automaticamente)
-  recordings/AAAA-MM-DD/            # gravações WAV (criado automaticamente)
-```
-
-### Banco de dados (SQLite)
-
-- `aircraft` — última informação conhecida de cada ICAO.
-- `flight_sessions` — cada passagem de uma aeronave pela cobertura do receptor.
-- `positions` — histórico de posições (trilha), com throttling para não
-  gravar pontos redundantes.
-- `adsb_messages_summary` — snapshot periódico de estatísticas globais.
-- `radio_recordings` — cada gravação automática de rádio.
-
-A tabela `radio_recordings.start_time` e `positions.timestamp`/
-`flight_sessions` já ficam no mesmo formato de timestamp (ISO 8601 UTC),
-propositalmente, para permitir cruzar transmissões de rádio com a posição
-das aeronaves no momento — próxima etapa natural deste projeto.
-
----
-
-## 13. Fora do escopo desta primeira versão
-
-Deliberadamente **não** implementado (arquitetura deixada aberta para o
-futuro): transcrição de áudio (Whisper), correlação automática áudio↔aeronave,
-machine learning, APIs externas de rastreamento, scanner de frequências,
-FFT/waterfall, Docker, React, WebSocket, Redis, PostgreSQL.
+Eu só coloquei uma antena para ouvir.
