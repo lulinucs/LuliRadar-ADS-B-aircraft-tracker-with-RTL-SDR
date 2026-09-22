@@ -52,7 +52,7 @@ A **LATA — Liberdade Ainda que à Tardinha** está publicada em:
 
 **Copyfight: Pirataria & Cultura Livre**, p. 150.
 
-📖 [Consultar o livro em PDF](https://monoskop.org/images/b/b7/Tarin_Bruno_Belisario_Adriano_eds_Copyfight_Pirataria_and_Cultura_Livre.pdf)
+📖 [Consultar o livro em PDF](https://desarquivo.org/sites/default/files/copyfight.pdf)
 
 > O endereço originalmente citado junto à licença não está mais disponível. Por isso, este repositório referencia diretamente a publicação onde o texto pode ser consultado.
 
