@@ -8,7 +8,7 @@ A ideia começou simples: receber **ADS-B em 1090 MHz** e enxergar os aviões qu
 
 Naturalmente, saiu do controle.
 
-Hoje o mesmo dongle também pode virar um receptor de **rádio aeronáutico VHF em AM**, acompanhar frequências locais, reproduzir o áudio, detectar transmissões, gravá-las automaticamente e manter um histórico das aeronaves recebidas.
+Hoje o projeto também experimenta usar o mesmo dongle como receptor de **rádio aeronáutico VHF em AM**, com controle de frequências, detecção de sinal, gravação de transmissões e a ideia futura de cruzar tudo isso com o histórico ADS-B.
 
 Tudo localmente.
 
@@ -26,7 +26,7 @@ Só antena, RF, alguns programas clássicos do ecossistema SDR e código.
 
 No centro do projeto está um **RTL-SDR Blog V4**.
 
-Originalmente derivados de receptores USB de TV digital, dispositivos RTL-SDR transformaram hardware barato em receptores de rádio definidos por software capazes de explorar uma faixa enorme do espectro.
+Dispositivos RTL-SDR transformaram hardware originalmente relacionado à recepção de TV digital em receptores de rádio definidos por software capazes de explorar uma faixa enorme do espectro.
 
 No LuliRadar, um único dongle atualmente tem duas vidas:
 
@@ -34,7 +34,7 @@ No LuliRadar, um único dongle atualmente tem duas vidas:
 Recebe as transmissões digitais enviadas pelas aeronaves.
 
 **🎙️ Rádio aeronáutico — VHF AM**  
-Permite ouvir e registrar comunicações em frequências como Torre, Solo e ATIS.
+Permite experimentar com frequências como Torre, Solo e ATIS.
 
 O problema divertido é que ele continua sendo **um único rádio**.
 
@@ -135,83 +135,70 @@ Os dados atuais ficam em memória para resposta rápida da API, enquanto informa
 
 ---
 
-# 🎙️ Rádio aeronáutico
+# 🎙️ Rádio aeronáutico — experimental
 
-O segundo modo entrega o dongle ao `rtl_fm`.
+> ⚠️ **Esta parte ainda está em desenvolvimento.**
+>
+> A recepção de áudio pelo LuliRadar já funciona, assim como o controle do
+> `rtl_fm`, medição de nível e a estrutura para gravação automática.
+> **Mas a experiência de escuta ainda está meio bugada e não está tão boa
+> quanto eu quero.**
+>
+> Se a intenção agora é simplesmente sintonizar e ouvir rádio aeronáutico,
+> **use o SDR++ — atualmente ele faz isso muito melhor. 😅**
+>
+> O objetivo do LuliRadar aqui não é substituir o SDR++, mas evoluir essa
+> parte até integrá-la de forma interessante com o restante da estação:
+> gravações, histórico, ADS-B e correlação temporal entre sinais.
 
-Em vez de decodificar pacotes ADS-B, agora estamos simplesmente **ouvindo rádio**.
+O segundo modo do projeto entrega o dongle ao `rtl_fm`.
+
+Em vez de decodificar pacotes ADS-B, agora estamos experimentando com a recepção de **rádio aeronáutico VHF em AM**.
 
 <p align="center">
-  <img src="imgs/Captura%20de%20tela%20de%202026-09-21%2022-31-10.png" alt="Tela de rádio do LuliRadar" width="900">
+  <img src="imgs/Captura%20de%20tela%20de%202026-09-21%2022-31-10.png" alt="Tela experimental de rádio do LuliRadar" width="900">
 </p>
 
-A interface permite selecionar frequências aeronáuticas, ajustar parâmetros e acompanhar o nível recebido.
+A interface já permite selecionar frequências, ajustar parâmetros e acompanhar o nível recebido.
 
-O áudio demodulado em AM é reproduzido localmente através do `aplay`.
+O backend também possui a lógica para detectar atividade acima do squelch e registrar transmissões em WAV.
 
-Mas eu não queria simplesmente deixar um rádio tocando.
+Essa parte, porém, ainda é **laboratório**.
 
-Então o LuliRadar também fica ouvindo o próprio áudio.
+A ideia é melhorar a recepção, acertar a experiência de escuta e então explorar o que realmente torna esse modo interessante dentro do LuliRadar: usar as transmissões recebidas junto com os dados que a própria estação capturou via ADS-B.
 
 ---
 
-## 🔴 Gravação automática
+## 🔴 Para onde vai o modo rádio
 
-O PCM produzido pelo `rtl_fm` passa pelo backend.
+A arquitetura para gravação automática já existe.
 
-A aplicação calcula o nível RMS do sinal e o converte para **dBFS**.
+O áudio PCM produzido pelo `rtl_fm` passa pelo backend, que calcula o nível RMS/dBFS e usa um squelch para identificar períodos de atividade.
 
-Quando o nível ultrapassa o squelch configurado:
+A partir disso, o sistema consegue criar gravações WAV e associá-las a horário, frequência e preset.
 
-**começou uma transmissão.**
+Há também um **pré-buffer circular**, pensado para evitar que o começo de uma transmissão seja perdido.
 
-O LuliRadar abre uma gravação.
+**Ainda estou acertando essa parte na prática.**
 
-Quando o sinal desaparece pelo tempo configurado:
+A meta não é construir mais um SDR++.
 
-**acabou a transmissão.**
+A meta é chegar nisto:
 
-O WAV é fechado e a ocorrência fica registrada.
-
-```mermaid
-flowchart LR
-    ANT["📡 Antena"]
-    SDR["RTL-SDR"]
-    FM["rtl_fm"]
-    PCM["PCM"]
-    LULI["LuliRadar"]
-
-    AUDIO["🔊 Áudio local"]
-    LEVEL["📊 RMS / dBFS"]
-    REC["🔴 Gravador"]
-    WAV["WAV"]
-    DB[("SQLite")]
-
-    ANT --> SDR
-    SDR --> FM
-    FM --> PCM
-    PCM --> LULI
-
-    LULI --> AUDIO
-    LULI --> LEVEL
-    LEVEL --> REC
-    REC --> WAV
-    REC --> DB
+```text
+118.700 MHz
+14:32:08
+│
+├── 🎙️ transmissão recebida
+├── 🔊 gravação
+│
+└── ✈️ aeronaves que estavam na região naquele instante
+      ├── AZU1234
+      ├── GLO5678
+      └── ...
 ```
 
-Existe ainda um **pré-buffer circular**.
-
-Isso permite guardar alguns instantes anteriores à detecção e reduz a chance de a gravação começar depois das primeiras sílabas da transmissão.
-
-É um detalhe pequeno.
-
-Mas é exatamente o tipo de detalhe que transforma:
-
-> “consigo ouvir rádio”
-
-em:
-
-> “estou construindo uma estação”.
+É aí que rádio e ADS-B deixam de ser duas experiências separadas e começam a virar uma estação só.
 
 ---
 
@@ -299,7 +286,7 @@ Se duas requisições tentarem trocar o rádio simultaneamente, uma delas é rej
 
 Essa parte acabou sendo uma das coisas mais interessantes do projeto.
 
-O software precisa respeitar o rádio.
+**O software precisa respeitar o rádio.**
 
 ---
 
@@ -342,7 +329,7 @@ O LuliRadar sabe aproximadamente:
 
 > qual aeronave estava onde em determinado instante
 
-e também:
+e também pode registrar:
 
 > em qual frequência houve uma transmissão naquele instante.
 
@@ -359,9 +346,11 @@ Isso abre uma possibilidade que quero explorar bastante.
       └── ...
 ```
 
-Isso não significa que seja possível afirmar automaticamente quem falou.
+Isso **não significa que seja possível afirmar automaticamente quem falou**.
 
 Mas significa que os dois conjuntos de dados podem começar a conversar.
+
+E é justamente essa interseção entre **RF + dados + software** que eu quero explorar com o projeto.
 
 ---
 
@@ -369,6 +358,9 @@ Mas significa que os dois conjuntos de dados podem começar a conversar.
 
 Algumas coisas que quero experimentar:
 
+- melhorar e estabilizar a recepção do modo rádio;
+- melhorar a reprodução de áudio;
+- acertar squelch e detecção automática de transmissões;
 - correlacionar transmissões com aeronaves observadas naquele instante;
 - mostrar quais aeronaves estavam próximas durante uma gravação;
 - reproduzir gravações diretamente pelo histórico;
@@ -536,6 +528,10 @@ Depois abra:
 http://127.0.0.1:5000
 ```
 
+Pressione `Ctrl+C` para encerrar.
+
+O LuliRadar tenta finalizar os processos associados ao SDR e liberar o dongle de forma limpa.
+
 ---
 
 # 🧪 Testes
@@ -620,6 +616,10 @@ O LuliRadar não pretende substituir:
 - softwares especializados de controle de tráfego aéreo.
 
 Eles resolvem problemas diferentes.
+
+Especialmente no caso do **SDR++**: se você quer simplesmente explorar o espectro e ouvir rádio agora, **use ele**.
+
+O modo rádio do LuliRadar ainda é experimental.
 
 Esse projeto é uma **estação pessoal de experimentação**.
 
