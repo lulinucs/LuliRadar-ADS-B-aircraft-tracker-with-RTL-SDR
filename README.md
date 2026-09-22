@@ -680,6 +680,25 @@ E uma desculpa para fazer software brincando com rádio.
 
 ---
 
+# 🪣 Licença
+
+O código original do LuliRadar é distribuído sob a **LATA — Liberdade Ainda que à Tardinha, versão 0.3.1**.
+
+Pode usar, estudar, modificar, amassar e distribuir. A LATA só pede que o
+resultado continue livre sob os mesmos termos — e tem algumas opiniões bem
+específicas sobre certos usos comerciais. 😅
+
+O texto integral está em [`LICENSE.md`](LICENSE.md).
+
+A licença foi publicada em **Copyfight: Pirataria & Cultura Livre**, p. 150:
+
+https://monoskop.org/images/b/b7/Tarin_Bruno_Belisario_Adriano_eds_Copyfight_Pirataria_and_Cultura_Livre.pdf
+
+Dependências, softwares, marcas e outros materiais de terceiros mantêm suas
+respectivas licenças e direitos.
+
+---
+
 # 📻 LuliRadar
 
 **O céu está transmitindo um monte de coisa.**
