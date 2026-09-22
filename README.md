@@ -21,7 +21,7 @@ Só antena, RF, alguns programas clássicos do ecossistema SDR e código.
 ## 📻 O rádio
 
 <p align="center">
-  <img src="imgs/rtl-sdr-v4.jpg" alt="RTL-SDR Blog V4" width="600">
+  <img src="imgs/sdr.jpg" alt="RTL-SDR Blog V4" width="600">
 </p>
 
 No centro do projeto está um **RTL-SDR Blog V4**.
@@ -49,7 +49,7 @@ Então o software precisa decidir quem fica com o SDR.
 E um rádio sem antena não escuta muita coisa.
 
 <p align="center">
-  <img src="imgs/antena-artesanal.jpg" alt="Antena artesanal para recepção SDR" width="600">
+  <img src="imgs/antena.jpg" alt="Antena artesanal para recepção SDR" width="600">
 </p>
 
 Parte da graça do SDR é justamente experimentar também com o lado físico da coisa: antenas simples, cabo coaxial, conectores, posição, comprimento dos elementos e descobrir até onde um receptor USB consegue enxergar.
