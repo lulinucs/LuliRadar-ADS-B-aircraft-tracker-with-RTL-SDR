@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SDR Aviation Monitor</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>SDR AVIATION MONITOR</h1>
+  <div class="mode-switch">
+    <button id="btn-mode-adsb" class="mode-btn">
+      <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 20 20 12 16 4 20Z"/></svg>
+      ADS-B
+    </button>
+    <button id="btn-mode-radio" class="mode-btn">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="20" x2="12" y2="8"/><circle cx="12" cy="5" r="2"/><path d="M7 10a7 7 0 0 1 10 0"/><path d="M4 13a11 11 0 0 1 16 0"/></svg>
+      RÁDIO
+    </button>
+  </div>
+  <div class="sdr-indicator">
+    <span id="sdr-dot" class="dot offline"></span>
+    <span id="sdr-status-text">SDR OFFLINE</span>
+  </div>
+</header>
+
+<div id="warning-banner" class="banner banner-warn" hidden></div>
+<div id="toast-container"></div>
+
+<main>
+
+  <!-- ==================== MODO ADS-B ==================== -->
+  <section id="view-adsb" class="view" hidden>
+    <div class="mode-control-bar">
+      <div id="adsb-sdr-banner" class="sdr-banner" hidden></div>
+      <button id="btn-adsb-start" class="btn-primary">
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l14-8Z"/></svg>
+        <span class="btn-label">Iniciar ADS-B</span>
+      </button>
+      <button id="btn-adsb-stop" class="btn-danger" disabled>
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+        <span class="btn-label">Parar ADS-B</span>
+      </button>
+    </div>
+
+    <div class="adsb-subnav">
+      <button id="btn-sub-live" class="subnav-btn active">
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>
+        AO VIVO
+      </button>
+      <button id="btn-sub-history" class="subnav-btn">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 9 9 9"/></svg>
+        HISTÓRICO
+      </button>
+    </div>
+
+    <!-- ---------- AO VIVO ---------- -->
+    <div id="adsb-live" class="adsb-subview">
+      <div class="metrics-bar">
+        <div class="kpi">
+          <span class="kpi-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="20" x2="12" y2="8"/><circle cx="12" cy="5" r="2"/><path d="M7 10a7 7 0 0 1 10 0"/><path d="M4 13a11 11 0 0 1 16 0"/></svg></span>
+          <span class="kpi-text"><span class="kpi-label">RTL-SDR</span><span id="m-sdr" class="kpi-value">-</span></span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/><line x1="12" y1="12" x2="18" y2="6"/></svg></span>
+          <span class="kpi-text"><span class="kpi-label">dump1090</span><span id="m-dump1090" class="kpi-value">-</span></span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-icon"><svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 20 20 12 16 4 20Z"/></svg></span>
+          <span class="kpi-text"><span class="kpi-label">Aeronaves</span><span id="m-aircraft-count" class="kpi-value">0</span></span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l2-7 4 14 2-7h6"/></svg></span>
+          <span class="kpi-text"><span class="kpi-label">Mensagens/s</span><span id="m-msg-rate" class="kpi-value">0</span></span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8 12 3l9 5-9 5-9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><line x1="12" y1="13" x2="12" y2="21"/></svg></span>
+          <span class="kpi-text"><span class="kpi-label">Total msgs</span><span id="m-msg-total" class="kpi-value">0</span></span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></span>
+          <span class="kpi-text"><span class="kpi-label">Atualizado</span><span id="m-last-update" class="kpi-value">-</span></span>
+        </div>
+      </div>
+
+      <div class="adsb-layout">
+        <div class="map-panel"><div id="map"></div></div>
+
+        <aside class="side-panel">
+          <div id="aircraft-detail" class="detail-panel" hidden>
+            <div class="detail-header">
+              <div class="detail-id">
+                <span id="d-callsign" class="detail-callsign">-</span>
+                <span id="d-icao" class="detail-icao">-</span>
+              </div>
+              <button id="d-close" class="btn-close" title="Fechar">×</button>
+            </div>
+
+            <div class="detail-grid">
+              <div class="detail-stat"><span class="lbl">Altitude</span><span id="d-altitude" class="val">-</span></div>
+              <div class="detail-stat"><span class="lbl">Velocidade</span><span id="d-speed" class="val">-</span></div>
+              <div class="detail-stat"><span class="lbl">Direção</span><span id="d-track" class="val">-</span></div>
+              <div class="detail-stat"><span class="lbl">Vertical</span><span id="d-vrate" class="val">-</span></div>
+              <div class="detail-stat"><span class="lbl">Distância</span><span id="d-distance" class="val">-</span></div>
+              <div class="detail-stat"><span class="lbl">RSSI</span><span id="d-rssi" class="val">-</span></div>
+              <div class="detail-stat"><span class="lbl">Squawk</span><span id="d-squawk" class="val">-</span></div>
+              <div class="detail-stat"><span class="lbl">Mensagens</span><span id="d-messages" class="val">-</span></div>
+              <div class="detail-stat"><span class="lbl">Último pacote</span><span id="d-seen" class="val">-</span></div>
+              <div class="detail-stat"><span class="lbl">1ª detecção</span><span id="d-first-seen" class="val">-</span></div>
+            </div>
+
+            <div class="detail-secondary">
+              <span>Lat <span id="d-lat">-</span></span>
+              <span>Lon <span id="d-lon">-</span></span>
+              <span>Cat. <span id="d-category">-</span></span>
+            </div>
+
+            <div class="state-badge" id="d-state"></div>
+            <div class="inference-note">* inferência simples, não oficial</div>
+          </div>
+
+          <div class="ac-list-wrap">
+            <div class="ac-list" id="aircraft-list">
+              <div class="ac-header">
+                <div class="ac-h-id" data-sort="callsign">AERONAVE</div>
+                <div class="ac-h-num" data-sort="altitude" title="Altitude (ft)">ALT</div>
+                <div class="ac-h-num" title="Velocidade no solo (kt)">VEL</div>
+                <div class="ac-h-num" title="Direção / track (°)">DIR</div>
+                <div class="ac-h-num" title="Velocidade vertical (ft/min)">V/S</div>
+                <div class="ac-h-num" data-sort="distance" title="Distância do receptor (nm)">DIST</div>
+              </div>
+              <div class="ac-body" id="aircraft-tbody"></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- ---------- HISTÓRICO ---------- -->
+    <div id="adsb-history" class="adsb-subview" hidden>
+      <div class="history-toolbar">
+        <div class="history-title">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 9 9 9"/></svg>
+          <h2>Histórico ADS-B</h2>
+        </div>
+        <div class="history-summary">
+          <span><strong id="hist-count">0</strong> sessões carregadas</span>
+          <span class="sep">·</span>
+          <span><strong id="hist-unique">0</strong> aeronaves únicas</span>
+        </div>
+        <div class="history-filters">
+          <label class="search-field">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="hist-search" placeholder="Buscar callsign ou ICAO">
+          </label>
+          <input type="date" id="hist-date" title="Filtrar por data">
+          <button id="hist-clear-filters" class="btn-secondary btn-sm" type="button">Limpar</button>
+        </div>
+      </div>
+
+      <div class="history-layout">
+        <div class="history-sessions" id="history-sessions"></div>
+        <div class="history-detail">
+          <div id="history-detail-empty" class="history-empty">Selecione uma sessão à esquerda para ver a trajetória.</div>
+          <div id="history-detail-content" class="history-detail-content" hidden>
+            <div class="detail-panel">
+              <div class="detail-header">
+                <div class="detail-id">
+                  <span id="hd-callsign" class="detail-callsign">-</span>
+                  <span id="hd-icao" class="detail-icao">-</span>
+                </div>
+              </div>
+              <div class="detail-grid">
+                <div class="detail-stat"><span class="lbl">Início</span><span id="hd-start" class="val">-</span></div>
+                <div class="detail-stat"><span class="lbl">Fim</span><span id="hd-end" class="val">-</span></div>
+                <div class="detail-stat"><span class="lbl">Duração</span><span id="hd-duration" class="val">-</span></div>
+                <div class="detail-stat"><span class="lbl">Altitude</span><span id="hd-altitude" class="val">-</span></div>
+                <div class="detail-stat"><span class="lbl">Vel. máx</span><span id="hd-speed" class="val">-</span></div>
+                <div class="detail-stat"><span class="lbl">Dist. mín</span><span id="hd-dist" class="val">-</span></div>
+                <div class="detail-stat"><span class="lbl">Posições</span><span id="hd-positions" class="val">-</span></div>
+              </div>
+            </div>
+            <div id="history-map" class="history-map"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== MODO RÁDIO ==================== -->
+  <section id="view-radio" class="view" hidden>
+    <div class="radio-layout">
+      <div class="radio-display-panel">
+        <div id="radio-sdr-banner" class="sdr-banner" hidden></div>
+
+        <div class="freq-display">
+          <span id="radio-freq-display">---.---</span><span class="freq-unit">MHz</span>
+          <span class="mode-tag">AM</span>
+        </div>
+        <div class="active-preset">Preset ativo: <span id="radio-active-preset">-</span></div>
+        <div class="squelch-state" id="radio-squelch-state">SILÊNCIO</div>
+
+        <div class="level-meter-wrap">
+          <div class="level-meter"><div id="level-bar" class="level-bar"></div></div>
+          <div class="level-numbers">
+            <span id="level-dbfs">-120.0 dBFS</span>
+            <span id="level-rms">RMS 0</span>
+          </div>
+        </div>
+
+        <form id="radio-form" class="radio-controls">
+          <label>Preset
+            <select id="radio-preset"></select>
+          </label>
+          <label>Frequência (MHz)
+            <input type="number" id="radio-frequency" step="0.001" min="20" max="1800" placeholder="ex: 118.700">
+            <small class="field-hint">valores em MHz com ponto decimal, ex.: 118.700 (não 118700)</small>
+          </label>
+          <label>Ganho (dB ou "auto")
+            <input type="text" id="radio-gain" value="auto">
+          </label>
+          <label>Squelch (dBFS): <span id="radio-squelch-val">-35</span>
+            <input type="range" id="radio-squelch" min="-60" max="0" step="1" value="-35">
+          </label>
+          <label>Volume: <span id="radio-volume-val">1.0x</span>
+            <input type="range" id="radio-volume" min="0" max="2" step="0.1" value="1.0">
+          </label>
+          <details>
+            <summary>Avançado</summary>
+            <label>Timeout de silêncio (s)
+              <input type="number" id="radio-silence-timeout" step="0.1" value="2.0">
+            </label>
+            <label>Pré-buffer (s)
+              <input type="number" id="radio-prebuffer" step="0.1" value="1.5">
+            </label>
+          </details>
+          <div class="radio-buttons">
+            <button type="button" id="btn-radio-start" class="btn-primary">
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l14-8Z"/></svg>
+              <span class="btn-label">Iniciar</span>
+            </button>
+            <button type="button" id="btn-radio-tune" class="btn-secondary">Sintonizar</button>
+            <button type="button" id="btn-radio-stop" class="btn-danger">
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+              <span class="btn-label">Parar</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="recordings-panel">
+        <h2>Últimas transmissões</h2>
+        <audio id="recording-player" controls></audio>
+        <div class="table-wrap">
+          <table id="recordings-table">
+            <thead>
+              <tr><th>Horário</th><th>Preset</th><th>Frequência</th><th>Duração</th><th>Pico</th><th></th></tr>
+            </thead>
+            <tbody id="recordings-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Torre Florianópolis",
+    "frequency_mhz": 118.700,
+    "mode": "am",
+    "notes": "Torre SBFL (Aeroporto Internacional Hercílio Luz). Fonte: AISWEB/DECEA."
+  },
+  {
+    "name": "ATIS Florianópolis",
+    "frequency_mhz": 127.450,
+    "mode": "am",
+    "notes": "D-ATIS SBFL. Fonte: AISWEB/DECEA. Bom teste de ponta a ponta do gravador (transmissão contínua e previsível)."
+  },
+  {
+    "name": "Solo Florianópolis",
+    "frequency_mhz": 121.700,
+    "mode": "am",
+    "notes": "Controle de solo SBFL. Fonte: AISWEB/DECEA."
+  },
+  {
+    "name": "Operações Florianópolis",
+    "frequency_mhz": 122.500,
+    "mode": "am",
+    "notes": "Frequência de operações SBFL. Fonte: AISWEB/DECEA."
+  },
+  {
+    "name": "Emergência / Guard",
+    "frequency_mhz": 121.500,
+    "mode": "am",
+    "notes": "Frequência internacional de emergência VHF (Guard)."
+  },
+  {
+    "name": "Torre MIL",
+    "frequency_mhz": 122.800,
+    "mode": "am",
+    "notes": "Torre militar SBFL. Fonte: AISWEB/DECEA."
+  }
+]
